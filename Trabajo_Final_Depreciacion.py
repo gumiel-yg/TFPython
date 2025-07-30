@@ -1,5 +1,3 @@
-# depreciacion_app.py
-
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -10,10 +8,26 @@ from datetime import datetime
 # Configuración visual de seaborn
 sns.set(style="whitegrid")
 
-# Cargar datos
+# Cargar datos desde el CSV
 @st.cache_data
 def cargar_dataset():
-    return pd.read_csv("dataset_depreciacion24051.csv",encoding="latin1")
+    df = pd.read_csv("dataset_depreciacion24051.csv", encoding="latin1")
+    
+    # Normalizar nombres de columnas
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace("á", "a")
+        .str.replace("é", "e")
+        .str.replace("í", "i")
+        .str.replace("ó", "o")
+        .str.replace("ú", "u")
+        .str.replace("ñ", "n")
+    )
+
+    return df
 
 # Función para calcular la depreciación lineal
 def calcular_depreciacion_lineal(valor_inicial, vida_util_anios, fecha_adquisicion):
@@ -32,12 +46,16 @@ def calcular_depreciacion_lineal(valor_inicial, vida_util_anios, fecha_adquisici
 
     return depreciacion_anual, valor_actual, depreciacion_acumulada, valores_restantes
 
-# Interfaz de Streamlit
+# Interfaz Streamlit
 def main():
     st.title("Cálculo de Depreciación por Línea Recta en Bolivia")
     st.write("Basado en el Decreto Supremo N° 24051")
 
     df = cargar_dataset()
+    
+    # Mostrar columnas para depuración
+    st.write("Columnas del archivo:", df.columns.tolist())
+
     st.subheader("Vista previa de la tabla de activos:")
     st.dataframe(df)
 
@@ -48,7 +66,11 @@ def main():
     fecha_adquisicion = st.date_input("Seleccione la fecha de adquisición del activo:")
 
     if st.button("Calcular Depreciación"):
-        vida_util = df[df['nombre_generico'] == activo_seleccionado]['vida_util_anios'].values[0]
+        try:
+            vida_util = df[df['nombre_generico'] == activo_seleccionado]['vida_util_anos'].values[0]
+        except KeyError:
+            st.error("❌ La columna 'vida_util_anos' no se encuentra. Verifica los nombres del archivo CSV.")
+            return
 
         dep_anual, valor_actual, dep_acum, valores_restantes = calcular_depreciacion_lineal(
             valor_comercial, vida_util, fecha_adquisicion
@@ -57,7 +79,7 @@ def main():
         st.success(f"Depreciación anual: Bs {dep_anual:.2f}")
         st.info(f"Valor actual estimado del activo: Bs {valor_actual:.2f}")
 
-        # Visualización con Matplotlib y Seaborn
+        # Visualización
         fig, ax = plt.subplots(figsize=(10, 5))
         anios = list(range(vida_util + 1))
         sns.lineplot(x=anios, y=valores_restantes, marker="o", label="Valor restante", ax=ax)
