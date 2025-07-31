@@ -1,27 +1,27 @@
-nombre_generico,vida_util_anos
-Edificaciones,40
-Muebles y enseres de oficina,10
-Maquinaria en general,8
-Equipos e instalaciones,8
-Barcos y lanchas en general,10
-Vehículos automotores,5
-Aviones,5
-Maquinaria para la construcción,5
-Maquinaria agrícola,4
-Animales de trabajo,4
-Herramientas en general,4
-Reproductores y hembras de pedigree o puros por cruza,8
-Equipos de computación,4
-Canales de regadío y pozos,20
-"Estanques, bañaderos y abrevaderos",10
-"Alambrados, tranqueras y vallas",10
-"Viviendas, para el personal",20
-Muebles y enseres en las viviendas para el personal,10
-"Silos, almacenes y galpones",20
-Tinglados y cobertizos de madera,5
-Tinglados y cobertizos de metal,10
-Instalaciones de electrificación y telefonía rurales,10
-Caminos interiores,10
-Caña de azúcar,5
-Vides,8
-Frutales,10
+activo,nombre_activo,vida_util
+,Edificaciones,40
+,Muebles y enseres de oficina,10
+,Maquinaria en general,8
+,Equipos e instalaciones,8
+,Barcos y lanchas en general,10
+,Vehículos automotores,5
+,Aviones,5
+,Maquinaria para la construcción,5
+,Maquinaria agrícola,4
+,Animales de trabajo,4
+,Herramientas en general,4
+,Reproductores y hembras de pedigree o puros por cruza,8
+,Equipos de computación,4
+,Canales de regadío y pozos,20
+,"Estanques, bañaderos y abrevaderos",10
+,"Alambrados, tranqueras y vallas",10
+,"Viviendas, para el personal",20
+,Muebles y enseres en las viviendas para el personal,10
+,"Silos, almacenes y galpones",20
+,Tinglados y cobertizos de madera,5
+,Tinglados y cobertizos de metal,10
+,Instalaciones de electrificación y telefonía rurales,10
+,Caminos interiores,10
+,Caña de azúcar,5
+,Vides,8
+,Frutales,10
