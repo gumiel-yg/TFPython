@@ -6,65 +6,120 @@ import streamlit as st
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
 
-# Cargar el dataset con codificación segura
+# Cargar datasets
 @st.cache_data
-def cargar_dataset():
+def cargar_activos():
     return pd.read_csv("dataset_depreciacion24051.csv", encoding="latin1")
 
-dataset = cargar_dataset()
+@st.cache_data
+def cargar_ufv():
+    df = pd.read_csv("UFV_BancoCentral.csv", encoding="latin1", parse_dates=["fecha"])
+    df['fecha'] = pd.to_datetime(df['fecha'])
+    return df
 
-# Interfaz
-st.title("🧮 Depreciación de Activos - Línea Recta (Bolivia)")
-st.subheader("Normativa DS 24051 | Cálculo actual y futuro")
+activos_df = cargar_activos()
+ufv_df = cargar_ufv()
 
-# Entradas del usuario
-activo_seleccionado = st.selectbox("Seleccione el tipo de activo:", dataset['nombre_activo'].unique())
-valor_compra = st.number_input("Valor de compra del activo (Bs):", min_value=0.0, step=100.0)
-fecha_adquisicion = st.date_input("Fecha de adquisición del activo:")
+# Interfaz de usuario
+st.title("🧮 Depreciación y Reexpresión UFV - Bolivia")
+st.subheader("DS 24051 Art. 22 + Norma Contable Nº 3 (UFV)")
 
-# Procesamiento
-vida_util = int(dataset.loc[dataset['nombre_activo'] == activo_seleccionado, 'vida_util'].values[0])
-hoy = datetime.now().date()
-dias_transcurridos = (hoy - fecha_adquisicion).days
-anios_transcurridos_exactos = dias_transcurridos / 365.25
-anios_transcurridos = int(min(anios_transcurridos_exactos, vida_util))
+st.markdown("Ingrese hasta **5 activos fijos** para calcular su depreciación actual y futura:")
 
-depreciacion_anual = valor_compra / vida_util
-depreciacion_acumulada = depreciacion_anual * anios_transcurridos
-valor_en_libros = max(0.0, valor_compra - depreciacion_acumulada)
+# Función para obtener UFV por fecha
+def get_ufv_by_date(fecha):
+    closest_date = ufv_df.iloc[(ufv_df['fecha'] - fecha).abs().argsort()[:1]]
+    return float(closest_date['ufv'])
+
+# Inicializar listas
+resultados = []
+
+for i in range(1, 6):
+    st.markdown(f"### Activo {i}")
+    nombre_activo = st.selectbox(f"Nombre del activo {i}", activos_df['nombre_activo'].unique(), key=f"activo_{i}")
+    valor_compra = st.number_input(f"Valor de compra (Bs) del activo {i}:", min_value=0.0, step=100.0, key=f"valor_{i}")
+    fecha_adq = st.date_input(f"Fecha de adquisición del activo {i}:", key=f"fecha_{i}")
+
+    if valor_compra > 0:
+        vida_util = int(activos_df.loc[activos_df['nombre_activo'] == nombre_activo, 'vida_util'].values[0])
+        hoy = datetime.now().date()
+        fecha_31dic = pd.to_datetime(f"{hoy.year}-12-31").date()
+
+        # Calcular años transcurridos
+        dias = (hoy - fecha_adq).days
+        anios_trans = int(min(dias // 365, vida_util))
+
+        # Reexpresión UFV
+        ufv_inicio = get_ufv_by_date(pd.to_datetime(fecha_adq))
+        ufv_actual = get_ufv_by_date(pd.to_datetime(hoy))
+        factor_ajuste = ufv_actual / ufv_inicio
+        valor_actualizado = valor_compra * factor_ajuste
+
+        # Depreciación lineal
+        depreciacion_anual = valor_actualizado / vida_util
+        depreciacion_acumulada = depreciacion_anual * anios_trans
+        valor_libros = max(0, valor_actualizado - depreciacion_acumulada)
+
+        resultados.append({
+            'Activo': nombre_activo,
+            'Valor Compra': valor_compra,
+            'Fecha Adquisición': fecha_adq,
+            'Vida Útil': vida_util,
+            'UFV Inicial': ufv_inicio,
+            'UFV Actual': ufv_actual,
+            'Factor Ajuste': factor_ajuste,
+            'Valor Ajustado': valor_actualizado,
+            'Depreciación Anual': depreciacion_anual,
+            'Años Transcurridos': anios_trans,
+            'Depreciación Acumulada': depreciacion_acumulada,
+            'Valor en Libros': valor_libros
+        })
 
 # Mostrar resultados
-st.write(f"📅 Fecha de hoy: **{hoy}**")
-st.write(f"📌 Vida útil del activo: **{vida_util} años**")
-st.write(f"⏳ Años transcurridos desde adquisición: **{anios_transcurridos} años**")
-st.write(f"💰 Depreciación anual: **Bs {depreciacion_anual:,.2f}**")
-st.write(f"📉 Depreciación acumulada: **Bs {depreciacion_acumulada:,.2f}**")
-st.write(f"📗 Valor actual en libros: **Bs {valor_en_libros:,.2f}**")
+if resultados:
+    st.subheader("📊 Resultados de Depreciación por Activo")
+    df_resultados = pd.DataFrame(resultados)
+    st.dataframe(df_resultados.style.format({
+        "Valor Compra": "Bs {:,.2f}",
+        "Valor Ajustado": "Bs {:,.2f}",
+        "Depreciación Anual": "Bs {:,.2f}",
+        "Depreciación Acumulada": "Bs {:,.2f}",
+        "Valor en Libros": "Bs {:,.2f}",
+        "Factor Ajuste": "{:,.4f}",
+        "UFV Inicial": "{:,.5f}",
+        "UFV Actual": "{:,.5f}"
+    }))
 
-# Generar series para visualización
-anios = np.arange(0, vida_util + 1)
-valores = np.maximum(valor_compra - depreciacion_anual * anios, 0)
-acumuladas = np.minimum(depreciacion_anual * anios, valor_compra)
+    # Gráficos por activo
+    for i, r in enumerate(resultados):
+        st.markdown(f"#### 📈 Evolución: {r['Activo']}")
+        anios = np.arange(0, r['Vida Útil'] + 1)
+        valores = np.maximum(r['Valor Ajustado'] - r['Depreciación Anual'] * anios, 0)
+        acumuladas = np.minimum(r['Depreciación Anual'] * anios, r['Valor Ajustado'])
 
-# Gráfica con seaborn y matplotlib
-fig, ax = plt.subplots()
-sns.lineplot(x=anios, y=valores, marker='o', label='Valor en Libros', ax=ax)
-sns.lineplot(x=anios, y=acumuladas, marker='x', label='Depreciación Acumulada', ax=ax)
-ax.set_title("Evolución del Activo: Valor y Depreciación")
-ax.set_xlabel("Años desde adquisición")
-ax.set_ylabel("Monto (Bs)")
-ax.grid(True)
-ax.legend()
-st.pyplot(fig)
+        fig, ax = plt.subplots()
+        sns.lineplot(x=anios, y=valores, label='Valor en libros', marker='o', ax=ax)
+        sns.lineplot(x=anios, y=acumuladas, label='Depreciación acumulada', marker='x', ax=ax)
+        ax.set_xlabel("Años desde adquisición")
+        ax.set_ylabel("Bs")
+        ax.set_title(f"{r['Activo']} - Depreciación UFV")
+        ax.grid(True)
+        ax.legend()
+        st.pyplot(fig)
 
-# Modelo predictivo con regresión lineal
-X = anios.reshape(-1, 1)
-y = valores
-modelo = LinearRegression()
-modelo.fit(X, y)
+    # Predicción con regresión lineal
+    st.subheader("🤖 Predicción de valor futuro (modelo lineal)")
+    activo_pred = st.selectbox("Seleccione activo para predecir valor:", [r['Activo'] for r in resultados])
+    activo_data = next(r for r in resultados if r['Activo'] == activo_pred)
 
-anio_futuro = st.slider("Selecciona un año futuro para predecir valor del activo:", 0, vida_util)
-valor_predicho = modelo.predict(np.array([[anio_futuro]]))[0]
-valor_predicho = max(0, valor_predicho)
+    anios = np.arange(0, activo_data['Vida Útil'] + 1)
+    valores = np.maximum(activo_data['Valor Ajustado'] - activo_data['Depreciación Anual'] * anios, 0)
 
-st.success(f"🧠 Predicción: Valor estimado del activo en el año {anio_futuro} desde adquisición: **Bs {valor_predicho:,.2f}**")
+    X = anios.reshape(-1, 1)
+    y = valores
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    anio_futuro = st.slider("Seleccione año futuro desde adquisición:", 0, activo_data['Vida Útil'])
+    valor_predicho = modelo.predict(np.array([[anio_futuro]]))[0]
+    st.success(f"Predicción de valor en el año {anio_futuro}: **Bs {valor_predicho:,.2f}**")
